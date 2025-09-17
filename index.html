@@ -1,174 +1,129 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Tasks - Minimal Frontend</title>
+  <meta charset="UTF-8">
+  <title>Task Dashboard</title>
   <style>
-    body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial; max-width:900px; margin:24px auto; padding:0 16px; color:#111; }
-    header { display:flex; align-items:center; justify-content:space-between; gap:12px; }
-    h1 { margin:0; font-size:1.4rem; }
-    .controls { display:flex; gap:8px; align-items:center; }
-    .card { border:1px solid #e3e3e3; padding:12px; border-radius:8px; margin:12px 0; background:#fafafa; }
-    .task-meta { font-size:0.85rem; color:#555; margin-top:6px; }
-    form { display:grid; gap:8px; grid-template-columns: 1fr auto; align-items:start; }
-    form .full { grid-column: 1 / -1; }
-    input, textarea, select, button { font:inherit; padding:8px; border:1px solid #ccc; border-radius:6px; }
-    button { cursor:pointer; }
-    .small { font-size:0.85rem; padding:6px 8px; }
-    .error { color:#9b0000; }
-    @media (min-width:700px) { form { grid-template-columns: 2fr 1fr 120px; } }
+    body { font-family: Arial, sans-serif; max-width: 800px; margin: 20px auto; }
+    h1 { text-align: center; }
+    form { margin-bottom: 20px; }
+    input, select { padding: 6px; margin-right: 10px; }
+    button { padding: 6px 12px; }
+    .task { border: 1px solid #ccc; padding: 10px; margin-bottom: 8px; border-radius: 5px; }
+    .meta { font-size: 0.85em; color: #555; }
+    #form-error { color: red; margin-top: 5px; }
   </style>
 </head>
 <body>
-  <header>
-    <h1>Tasks</h1>
-    <div class="controls">
-      <button id="refreshBtn" class="small">Refresh</button>
-    </div>
-  </header>
 
-  <section id="listArea">
-    <p id="loading">Loading tasks…</p>
-    <div id="tasks"></div>
-    <p id="emptyMsg" style="display:none;">No tasks yet.</p>
-  </section>
+  <h1>Task Dashboard</h1>
 
-  <hr/>
+  <form id="task-form">
+    <input id="title" placeholder="Task Title" required />
+    <select id="priority" required>
+      <option value="">Select Priority</option>
+      <option value="low">low</option>
+      <option value="medium">medium</option>
+      <option value="high">high</option>
+      <option value="urgent">urgent</option>
+    </select>
+    <button type="submit">Add Task</button>
+    <div id="form-error"></div>
+  </form>
 
-  <section>
-    <h2 style="font-size:1rem; margin:8px 0">Add new task</h2>
-    <form id="taskForm">
-      <input id="title" placeholder="Title (required)" required />
-      <select id="priority" aria-label="priority">
-        <option value="">Choose priority</option>
-        <option value="low">low</option>
-        <option value="medium">medium</option>
-        <option value="high">high</option>
-        <option value="urgent">urgent</option>
-      </select>
-      <button type="submit">Add</button>
-
-      <textarea id="description" class="full" rows="3" placeholder="Description (optional)"></textarea>
-    </form>
-    <p id="formError" class="error" style="display:none"></p>
-  </section>
+  <div id="tasks-container">Loading tasks…</div>
 
   <script>
-    const API = '/api/tasks'; // adjust if your backend is on another host (e.g. http://localhost:3000/api/tasks)
+    const API_BASE = '/api/tasks'; // works with the same server
 
-    const tasksContainer = document.getElementById('tasks');
-    const loading = document.getElementById('loading');
-    const emptyMsg = document.getElementById('emptyMsg');
-    const refreshBtn = document.getElementById('refreshBtn');
-    const form = document.getElementById('taskForm');
-    const titleInput = document.getElementById('title');
-    const descInput = document.getElementById('description');
-    const prioritySelect = document.getElementById('priority');
-    const formError = document.getElementById('formError');
-
+    // Load tasks on page load
     async function fetchTasks() {
-      loading.style.display = '';
-      tasksContainer.innerHTML = '';
-      emptyMsg.style.display = 'none';
+      const container = document.getElementById('tasks-container');
       try {
-        const res = await fetch(API);
-        if (!res.ok) throw new Error('Failed to fetch tasks');
+        const res = await fetch(API_BASE);
         const tasks = await res.json();
         renderTasks(tasks);
       } catch (err) {
-        tasksContainer.innerHTML = '<p class="error">Error loading tasks: ' + (err.message || err) + '</p>';
-      } finally {
-        loading.style.display = 'none';
+        console.error(err);
+        container.innerText = 'Unable to load tasks.';
       }
     }
 
     function renderTasks(tasks) {
-      if (!Array.isArray(tasks) || tasks.length === 0) {
-        emptyMsg.style.display = '';
+      const container = document.getElementById('tasks-container');
+      if (!tasks || tasks.length === 0) {
+        container.innerHTML = '<i>No tasks yet</i>';
         return;
       }
-      tasksContainer.innerHTML = '';
-      tasks.slice().reverse().forEach(t => {
-        const card = document.createElement('div');
-        card.className = 'card';
-
-        const title = document.createElement('div');
-        title.innerHTML = '<strong>' + escapeHtml(t.title) + '</strong>';
-
-        const idLine = document.createElement('div');
-        idLine.className = 'task-meta';
-        idLine.textContent = `${t.taskId || ''} — ${t.priority || ''} — ${t.status || ''}`;
-
-        const desc = document.createElement('div');
-        desc.style.marginTop = '8px';
-        desc.textContent = t.description || '';
-
-        const created = document.createElement('div');
-        created.className = 'task-meta';
-        created.textContent = 'Created: ' + (t.createdAt ? new Date(t.createdAt).toLocaleString() : 'unknown');
-
-        card.appendChild(title);
-        if (t.description) card.appendChild(desc);
-        card.appendChild(idLine);
-        card.appendChild(created);
-
-        tasksContainer.appendChild(card);
+      container.innerHTML = '';
+      tasks.slice().reverse().forEach(task => {
+        const div = document.createElement('div');
+        div.className = 'task';
+        div.innerHTML = `
+          <strong>${escapeHtml(task.title)}</strong>
+          <div class="meta">ID: ${task.taskId} • ${new Date(task.createdAt).toLocaleString()} • priority: ${task.priority} • status: ${task.status}</div>
+          <p>${escapeHtml(task.description)}</p>
+        `;
+        container.appendChild(div);
       });
     }
 
+    // Add task to UI immediately after POST
+    function addTaskToUI(task) {
+      const container = document.getElementById('tasks-container');
+      const div = document.createElement('div');
+      div.className = 'task';
+      div.innerHTML = `
+        <strong>${escapeHtml(task.title)}</strong>
+        <div class="meta">ID: ${task.taskId} • ${new Date(task.createdAt).toLocaleString()} • priority: ${task.priority} • status: ${task.status}</div>
+        <p>${escapeHtml(task.description)}</p>
+      `;
+      container.insertBefore(div, container.firstChild);
+    }
+
+    // Escape HTML to prevent XSS
     function escapeHtml(text) {
-      return String(text || '').replace(/[&<>"']/g, m => ({
-        '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;"
+      return String(text).replace(/[&<>"']/g, m => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
       }[m]));
     }
 
-    refreshBtn.addEventListener('click', fetchTasks);
+    // Handle form submit
+    document.getElementById('task-form').addEventListener('submit', async e => {
+      e.preventDefault();
+      const title = document.getElementById('title').value.trim();
+      const priority = document.getElementById('priority').value;
+      const errorDiv = document.getElementById('form-error');
+      errorDiv.innerText = '';
 
-    form.addEventListener('submit', async (ev) => {
-      ev.preventDefault();
-      formError.style.display = 'none';
-      const title = titleInput.value.trim();
-      const description = descInput.value.trim();
-      const priority = prioritySelect.value;
-
-      if (!title) {
-        formError.textContent = 'Title is required.';
-        formError.style.display = '';
-        return;
-      }
-      if (!['low','medium','high','urgent'].includes(priority)) {
-        formError.textContent = 'Please choose a valid priority.';
-        formError.style.display = '';
-        return;
-      }
-
-      const payload = { title, description, priority };
+      if (!title) return errorDiv.innerText = 'Title is required';
+      if (!['low','medium','high','urgent'].includes(priority)) return errorDiv.innerText = 'Select a valid priority';
 
       try {
-        const res = await fetch(API, {
+        const res = await fetch(API_BASE, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
+          body: JSON.stringify({ title, description: '', priority })
         });
-        if (res.status === 201) {
-          titleInput.value = '';
-          descInput.value = '';
-          prioritySelect.value = '';
-          fetchTasks();
-        } else {
-          const err = await res.json().catch(()=>({ error: 'Unknown error' }));
-          formError.textContent = err.error || 'Failed to create task';
-          formError.style.display = '';
+        if (!res.ok) {
+          const err = await res.json().catch(()=>({ error: res.statusText }));
+          throw new Error(err.error || 'Server error');
         }
+        const task = await res.json();
+        addTaskToUI(task);
+        e.target.reset();
       } catch (err) {
-        formError.textContent = 'Network error: ' + (err.message || err);
-        formError.style.display = '';
+        console.error(err);
+        errorDiv.innerText = 'Failed to create task.';
       }
     });
 
-    // initial load
-    fetchTasks();
+    document.addEventListener('DOMContentLoaded', fetchTasks);
   </script>
+
 </body>
 </html>
